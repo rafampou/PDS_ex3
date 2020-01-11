@@ -30,7 +30,7 @@ __global__ void ising(int *G, int *H, double *w, int n){
 
     int blockSpinsDim = 32*SPINS_PER_THREAD_DIM;
     int sharedSpinsDim = blockSpinsDim + 4;
-    
+
     // Load data to Shared memory
     for(int k = threadIdx.x; k < sharedSpinsDim ; k = k + 32){
         for(int l = threadIdx.y; l < sharedSpinsDim ; l = l + 32){
@@ -38,18 +38,18 @@ __global__ void ising(int *G, int *H, double *w, int n){
               sharedSpins[k*(sharedSpinsDim) + l] = G[((k + blockSpinsDim*blockIdx.x - 2  + n)%n)*n + ((l + blockSpinsDim*blockIdx.y - 2 + n)%n)];
         }
     }
-    
+
     __syncthreads();
 
     // Compute new spins using data from shared memory
-    int i_start = threadIdx.x*SPINS_PER_THREAD_DIM; 
+    int i_start = threadIdx.x*SPINS_PER_THREAD_DIM;
     int j_start = threadIdx.y*SPINS_PER_THREAD_DIM;
-    
+
     if(blockIdx.x*blockSpinsDim + i_start < n && blockIdx.y*blockSpinsDim + j_start < n){
-    
+
         int i_end = i_start + SPINS_PER_THREAD_DIM;
         int j_end = j_start + SPINS_PER_THREAD_DIM;
-    
+
         if(blockIdx.x*blockSpinsDim + i_end > n)
           if(blockIdx.x != 0)
             i_end = n%(blockIdx.x*blockSpinsDim);
@@ -60,16 +60,16 @@ __global__ void ising(int *G, int *H, double *w, int n){
             j_end = n%(blockIdx.y*blockSpinsDim);
           else
             j_end = n;
-        
+
         double influence = 0.0;
         for(int k = i_start; k < i_end; k++){
             for(int l = j_start; l < j_end; l++){
                 for(int x = 0; x < 5; x++){
-                    for(int y = 0; y < 5; y++){   
-                        influence += w[x*5 + y]*sharedSpins[((k + 2 - 2 + x + sharedSpinsDim)%sharedSpinsDim)*sharedSpinsDim + ((l + 2 - 2 + y + sharedSpinsDim)%sharedSpinsDim)];  
+                    for(int y = 0; y < 5; y++){
+                        influence += w[x*5 + y]*sharedSpins[((k + 2 - 2 + x + sharedSpinsDim)%sharedSpinsDim)*sharedSpinsDim + ((l + 2 - 2 + y + sharedSpinsDim)%sharedSpinsDim)];
                     }
-                } 
-                H[(blockIdx.x*blockSpinsDim + k)*n + (blockIdx.y*blockSpinsDim + l)] = sharedSpins[(k + 2)*sharedSpinsDim + (l + 2)]; 
+                }
+                H[(blockIdx.x*blockSpinsDim + k)*n + (blockIdx.y*blockSpinsDim + l)] = sharedSpins[(k + 2)*sharedSpinsDim + (l + 2)];
                 if(influence > 0.000000001){
                     H[(blockIdx.x*blockSpinsDim + k)*n + (blockIdx.y*blockSpinsDim + l)] = 1;
                 }
@@ -79,22 +79,34 @@ __global__ void ising(int *G, int *H, double *w, int n){
                 }
                 influence = 0.0;
             }
-        }        
+        }
     }
 }
 
-int main(){    
-    // Declare all variables
-    int n = N, k = K;
-	
+int main(int argc, char** argv){
+  // Declare all variables
+	int n = 0;
+int k = 0;
+if (argc != 3)
+{
+		n = N;
+		k = K;
+}
+else
+{
+		n = atoi(argv[1]);
+		k = atoi(argv[2]);
+		printf("Input n=%d k=%d", n, k);
+}
+
     int *G, *G_final, *G_dev, *H_dev;
     double *w_dev;
-	double w[25] = {0.004 , 0.016 , 0.026 , 0.016 , 0.004 , 
-	                0.016 , 0.071 , 0.117 , 0.071 , 0.016 , 
+	double w[25] = {0.004 , 0.016 , 0.026 , 0.016 , 0.004 ,
+	                0.016 , 0.071 , 0.117 , 0.071 , 0.016 ,
 					0.026 , 0.117 ,   0   , 0.117 , 0.026 ,
 					0.016 , 0.071 , 0.117 , 0.071 , 0.016 ,
 					0.004 , 0.016 , 0.026 , 0.016 , 0.004};
-    
+
     // Allocate host memory
     G = (int*)malloc(n*n*sizeof(int));
     G_final = (int*)malloc(n*n*sizeof(int));
@@ -137,7 +149,7 @@ int main(){
         }
         else{
             ising<<< dimGrid, dimBlock >>>(H_dev, G_dev, w_dev, n);
-        }  
+        }
     }
 
     // Write GPU results to host memory
@@ -146,7 +158,7 @@ int main(){
     else
       HANDLE_ERROR( cudaMemcpy(G_final, G_dev, n*n*sizeof(int), cudaMemcpyDeviceToHost) );
 
-    // Capture end time   
+    // Capture end time
     HANDLE_ERROR( cudaEventRecord( stop, 0 ) );
     HANDLE_ERROR( cudaEventSynchronize( stop ) );
     float elapsedTime;
@@ -176,10 +188,10 @@ void validate(int *G, int *G_final, double *w, int k, int n){
     clock_t start, end;
     double time_used;
     start = clock();
-    
+
     // Run sequential code for validation
     ising_host(G, w, k, n);
-    
+
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
     printf("\nTime used for sequential call: %f sec\n",time_used);
@@ -214,10 +226,10 @@ void ising_host( int *G, double *w, int k, int n){
        for(int i = 0; i < n; i++){
 	   	   for(int j = 0; j < n; j++){
                for(int x = 0; x < 5; x++){
-	   	   	       for(int y = 0; y < 5; y++){   
+	   	   	       for(int y = 0; y < 5; y++){
 	   	   	           influence += w[x*5 + y]*G[((i - 2 + x + n)%n)*n + ((j - 2 + y + n)%n)];
 	   	   	       }
-	            }   
+	            }
 	   	        H[i*n + j] = G[i*n + j];
 	   	        if(influence > 0.000000001){
 	   	   	     H[i*n + j] = 1;
@@ -242,5 +254,5 @@ void ising_host( int *G, double *w, int k, int n){
 		  for(int j = 0; j < n; j++)
 		     G[i*n + j] = H[i*n + j];
 	}
-    
+
 }
