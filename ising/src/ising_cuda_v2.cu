@@ -17,8 +17,8 @@ static void HandleError( cudaError_t err, const char *file, int line ) {
 }
 
 __global__ void checkForNoChanges(int *G, int *H, int *checkForNoChanges, int n){
-   
-    int i = threadIdx.x + blockIdx.x * blockDim.x; 
+
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
 
     if( (i < n) && (j < n)){
@@ -30,27 +30,27 @@ __global__ void checkForNoChanges(int *G, int *H, int *checkForNoChanges, int n)
 
 __global__ void ising(int *G, int *H, double *w, int n){
 
-    int i_start = (threadIdx.x + blockIdx.x * blockDim.x)*SPINS_PER_THREAD_DIM; 
+    int i_start = (threadIdx.x + blockIdx.x * blockDim.x)*SPINS_PER_THREAD_DIM;
     int j_start = (threadIdx.y + blockIdx.y * blockDim.y)*SPINS_PER_THREAD_DIM;
-   
+
     if( (i_start < n) && (j_start < n)){
 
         int i_end = i_start + SPINS_PER_THREAD_DIM;
         int j_end = j_start + SPINS_PER_THREAD_DIM;
-        
+
         if(i_end > n)
           i_end = n;
         if(j_end > n)
           j_end = n;
-        
+
         double influence = 0.0;
         for(int k = i_start; k < i_end; k++){
             for(int l = j_start; l < j_end; l++){
                 for(int x = 0; x < 5; x++){
-                    for(int y = 0; y < 5; y++){   
-                        influence += w[x*5 + y]*G[((k - 2 + x + n)%n)*n + ((l - 2 + y + n)%n)];  
+                    for(int y = 0; y < 5; y++){
+                        influence += w[x*5 + y]*G[((k - 2 + x + n)%n)*n + ((l - 2 + y + n)%n)];
                     }
-                } 
+                }
                 H[k*n + l] = G[k*n + l];
                 if(influence > 0.000000001){
                     H[k*n + l] = 1;
@@ -61,33 +61,47 @@ __global__ void ising(int *G, int *H, double *w, int n){
                 }
                 influence = 0.0;
             }
-        }        
+        }
     }
-    
+
 }
 
-int main(){  
+int main(int argc, char** argv){
+  // Declare all variables
+	int n = 0;
+int k = 0;
+if (argc != 3)
+{
+		n = N;
+		k = K;
+}
+else
+{
+		n = atoi(argv[1]);
+		k = atoi(argv[2]);
+		printf("Input n=%d k=%d", n, k);
+}
+
     // Check if SPINS_PER_THREAD_DIM is less than 3
     if( SPINS_PER_THREAD_DIM > 3){
         printf("\nERROR: SPINS_PER_THREAD_DIM must be less than 3. Aborting...\n");
         return -1;
-    }  
+    }
 
-    // Declare all variables
-    int n = N, k = K;
-	
+
+
     int *G, *G_final, *G_dev, *H_dev;
     double *w_dev;
-	double w[25] = {0.004 , 0.016 , 0.026 , 0.016 , 0.004 , 
-	                0.016 , 0.071 , 0.117 , 0.071 , 0.016 , 
+	double w[25] = {0.004 , 0.016 , 0.026 , 0.016 , 0.004 ,
+	                0.016 , 0.071 , 0.117 , 0.071 , 0.016 ,
 					0.026 , 0.117 ,   0   , 0.117 , 0.026 ,
 					0.016 , 0.071 , 0.117 , 0.071 , 0.016 ,
                     0.004 , 0.016 , 0.026 , 0.016 , 0.004};
-                    
+
     int *checkForNoChanges_SomeSpins;
     int *checkForNoChanges_AllSpins;
     int *checkForNoChanges_SomeSpins_dev;
-    int *checkForNoChanges_AllSpins_dev; 
+    int *checkForNoChanges_AllSpins_dev;
     int iterations = k;
 
     // Allocate host memory
@@ -107,7 +121,7 @@ int main(){
     HANDLE_ERROR( cudaMalloc((void**) &checkForNoChanges_SomeSpins_dev, sizeof(int) ));
     HANDLE_ERROR( cudaMalloc((void**) &checkForNoChanges_AllSpins_dev,  sizeof(int) ));
 
-    // Write to host memory 
+    // Write to host memory
     /* Assign random values to G) */
     int spin[] = {-1, 1};
     for(int i = 0; i < n; i++)
@@ -153,15 +167,15 @@ int main(){
                    printf("\nNo changes: %d iterations\n", q);
                    iterations = q;
                    break;
-               } 
+               }
                else{
                    checkForNoChanges_AllSpins[0] = 0;
                    HANDLE_ERROR( cudaMemcpy(checkForNoChanges_AllSpins_dev, checkForNoChanges_AllSpins, sizeof(int), cudaMemcpyHostToDevice));
-               }   
+               }
             }
             else{
                 checkForNoChanges_SomeSpins[0] = 0;
-                HANDLE_ERROR( cudaMemcpy(checkForNoChanges_SomeSpins_dev, checkForNoChanges_SomeSpins, sizeof(int), cudaMemcpyHostToDevice)); 
+                HANDLE_ERROR( cudaMemcpy(checkForNoChanges_SomeSpins_dev, checkForNoChanges_SomeSpins, sizeof(int), cudaMemcpyHostToDevice));
             }
         }
         else{
@@ -177,17 +191,17 @@ int main(){
                    printf("\nNo changes: %d iterations\n", q);
                    iterations = q;
                    break;
-               }  
+               }
                else{
                    checkForNoChanges_AllSpins[0] = 0;
                    HANDLE_ERROR( cudaMemcpy(checkForNoChanges_AllSpins_dev, checkForNoChanges_AllSpins, sizeof(int), cudaMemcpyHostToDevice));
-               }   
+               }
             }
             else{
                 checkForNoChanges_SomeSpins[0] = 0;
-                HANDLE_ERROR( cudaMemcpy(checkForNoChanges_SomeSpins_dev, checkForNoChanges_SomeSpins, sizeof(int), cudaMemcpyHostToDevice)); 
+                HANDLE_ERROR( cudaMemcpy(checkForNoChanges_SomeSpins_dev, checkForNoChanges_SomeSpins, sizeof(int), cudaMemcpyHostToDevice));
             }
-        }  
+        }
     }
 
     // Write GPU results to host memory
@@ -196,7 +210,7 @@ int main(){
     else
       HANDLE_ERROR( cudaMemcpy(G_final, G_dev, n*n*sizeof(int), cudaMemcpyDeviceToHost) );
 
-    // Capture end time  
+    // Capture end time
     HANDLE_ERROR( cudaEventRecord( stop, 0 ) );
     HANDLE_ERROR( cudaEventSynchronize( stop ) );
     float elapsedTime;
@@ -233,9 +247,9 @@ void validate(int *G, int *G_final, double *w, int k, int n){
     double time_used;
     start = clock();
 
-    // Run sequential code 
+    // Run sequential code
     ising_sequential(G, w, k, n);
-    
+
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
     printf("\nTime used for sequential call: %3.3f sec\n",time_used);
@@ -271,10 +285,10 @@ void ising_sequential( int *G, double *w, int k, int n){
        for(int i = 0; i < n; i++){
 	   	   for(int j = 0; j < n; j++){
                for(int x = 0; x < 5; x++){
-	   	   	       for(int y = 0; y < 5; y++){   
+	   	   	       for(int y = 0; y < 5; y++){
 	   	   	           influence += w[x*5 + y]*G[((i - 2 + x + n)%n)*n + ((j - 2 + y + n)%n)];
 	   	   	       }
-	            }   
+	            }
 	   	        H[i*n + j] = G[i*n + j];
 	   	        if(influence > 0.000000001){
 	   	   	     H[i*n + j] = 1;
@@ -299,5 +313,5 @@ void ising_sequential( int *G, double *w, int k, int n){
 		  for(int j = 0; j < n; j++)
 		     G[i*n + j] = H[i*n + j];
 	}
-    
+
 }
